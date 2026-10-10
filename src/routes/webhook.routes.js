@@ -35,29 +35,30 @@ router.post("/payment-status", (req, res) => {
       return res.status(401).json({ error: "Invalid signature" });
     }
 
-    if (!payment_id || !status) {
-      return res.status(400).json({ error: "payment_id and status required" });
+    if (!payment_id || !status || !event_id) {
+      return res.status(400).json({
+        error: "payment_id, status, and event_id required",
+      });
     }
 
-    // BUG E: No idempotency check
-    // Webhooks can be delivered multiple times - must be idempotent
-    // Missing check below:
-
-    // if (db.processed_webhooks.includes(event_id)) {
-    //   return res.status(200).json({ message: 'Already processed' });
-    // }
+    if (db.processed_webhooks.includes(event_id)) {
+      return res.status(200).json({
+        success: true,
+        message: "Webhook already processed",
+        event_id,
+      });
+    }
 
     const payment = getPaymentById(payment_id);
     if (!payment) {
       return res.status(404).json({ error: "Payment not found" });
     }
 
-    // Update payment status
     payment.status = status;
     payment.webhook_received_at = new Date();
 
-    // Mark webhook as processed (if idempotency was implemented)
-    // db.processed_webhooks.push(event_id);
+    // Record the event after successful processing.
+    db.processed_webhooks.push(event_id);
 
     res.status(200).json({
       success: true,
