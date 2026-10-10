@@ -5,6 +5,7 @@ import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import app from "../../app.js";
 import { db, initDatabase } from "../../db/database.js";
+import crypto from "node:crypto";
 
 const JWT_SECRET = "test-secret-key-do-not-use-in-production";
 
@@ -91,4 +92,76 @@ test("Bug B: rejects negative payment amount", async () => {
     });
 
   assert.equal(response.status, 400);
+});
+
+const WEBHOOK_SECRET = "test-webhook-secret-key";
+
+function signWebhook(payload) {
+  return crypto
+    .createHmac("sha256", WEBHOOK_SECRET)
+    .update(JSON.stringify(payload))
+    .digest("hex");
+}
+
+test("Bug D: accepts a valid webhook signature", async () => {
+  const payload = {
+    payment_id: "1",
+    status: "processing",
+    event_id: "evt_valid_signature",
+  };
+
+  const response = await request(app)
+    .post("/api/webhooks/payment-status")
+    .set("x-webhook-signature", signWebhook(payload))
+    .send(payload);
+
+  assert.equal(response.status, 200);
+  assert.equal(response.body.success, true);
+});
+
+test("Bug D: rejects an invalid webhook signature", async () => {
+  const response = await request(app)
+    .post("/api/webhooks/payment-status")
+    .set("x-webhook-signature", "fake-signature")
+    .send({
+      payment_id: "1",
+      status: "processing",
+      event_id: "evt_invalid_signature",
+    });
+
+  assert.equal(response.status, 401);
+});
+
+test("Bug D: rejects a missing webhook signature", async () => {
+  const response = await request(app)
+    .post("/api/webhooks/payment-status")
+    .send({
+      payment_id: "1",
+      status: "processing",
+      event_id: "evt_missing_signature",
+    });
+
+  assert.equal(response.status, 401);
+});
+
+test("Bug D: rejects a payload modified after signing", async () => {
+  const originalPayload = {
+    payment_id: "1",
+    status: "processing",
+    event_id: "evt_modified_payload",
+  };
+
+  const signature = signWebhook(originalPayload);
+
+  const modifiedPayload = {
+    ...originalPayload,
+    status: "completed",
+  };
+
+  const response = await request(app)
+    .post("/api/webhooks/payment-status")
+    .set("x-webhook-signature", signature)
+    .send(modifiedPayload);
+
+  assert.equal(response.status, 401);
 });
