@@ -1,7 +1,7 @@
-import express from 'express';
-import { authenticate } from '../middleware/auth.middleware.js';
-import { db } from '../db/database.js';
-import { v4 as uuidv4 } from 'uuid';
+import express from "express";
+import { authenticate } from "../middleware/auth.middleware.js";
+import { db } from "../db/database.js";
+import { v4 as uuidv4 } from "uuid";
 
 const router = express.Router();
 
@@ -9,19 +9,21 @@ const router = express.Router();
  * GET /api/table-orders
  * List all table orders for authenticated merchant
  */
-router.get('/', authenticate, (req, res) => {
+router.get("/", authenticate, (req, res) => {
   try {
     const merchantId = req.user.id;
-    const orders = (db.table_orders || []).filter(o => o.merchant_id === merchantId);
+    const orders = (db.table_orders || []).filter(
+      (o) => o.merchant_id === merchantId,
+    );
 
     res.json({
       success: true,
       data: orders,
-      count: orders.length
+      count: orders.length,
     });
   } catch (error) {
-    console.error('Get table orders error:', error);
-    res.status(500).json({ error: 'Failed to fetch table orders' });
+    console.error("Get table orders error:", error);
+    res.status(500).json({ error: "Failed to fetch table orders" });
   }
 });
 
@@ -29,45 +31,54 @@ router.get('/', authenticate, (req, res) => {
  * POST /api/table-orders
  * Create new table order
  */
-router.post('/', (req, res) => {
+router.post("/", (req, res) => {
   try {
-    const { merchant_id, table_number, items, customer_name, order_type } = req.body;
+    const { merchant_id, table_number, items, customer_name, order_type } =
+      req.body;
 
     if (!merchant_id || !table_number || !items || !Array.isArray(items)) {
-      return res.status(400).json({ error: 'merchant_id, table_number, and items array required' });
+      return res
+        .status(400)
+        .json({ error: "merchant_id, table_number, and items array required" });
     }
 
     if (items.length === 0) {
-      return res.status(400).json({ error: 'Order must have at least one item' });
+      return res
+        .status(400)
+        .json({ error: "Order must have at least one item" });
     }
 
-    // BUG F: No duplicate order prevention
-    // Should check if table already has a pending order
-    // Missing validation below:
-    
-    // const existingOrder = (db.table_orders || []).find(
-    //   o => o.merchant_id === merchant_id && 
-    //        o.table_number === table_number && 
-    //        o.status === 'pending'
-    // );
-    // if (existingOrder) {
-    //   return res.status(409).json({ error: 'Table already has a pending order' });
-    // }
+    // Prevent duplicate pending orders for the same merchant and table.
+    const existingOrder = (db.table_orders || []).find(
+      (order) =>
+        order.merchant_id === merchant_id &&
+        order.table_number === table_number &&
+        order.status === "pending",
+    );
+
+    if (existingOrder) {
+      return res.status(409).json({
+        error: "Table already has a pending order",
+      });
+    }
 
     // Calculate total
-    const total = items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+    const total = items.reduce(
+      (sum, item) => sum + item.price * item.quantity,
+      0,
+    );
 
     const newOrder = {
       id: uuidv4(),
       merchant_id,
       table_number,
       items,
-      customer_name: customer_name || 'Guest',
-      order_type: order_type || 'dine_in',
-      status: 'pending',
+      customer_name: customer_name || "Guest",
+      order_type: order_type || "dine_in",
+      status: "pending",
       total,
       created_at: new Date(),
-      updated_at: new Date()
+      updated_at: new Date(),
     };
 
     if (!db.table_orders) db.table_orders = [];
@@ -78,12 +89,12 @@ router.post('/', (req, res) => {
 
     res.status(201).json({
       success: true,
-      message: 'Table order created',
-      data: newOrder
+      message: "Table order created",
+      data: newOrder,
     });
   } catch (error) {
-    console.error('Create table order error:', error);
-    res.status(500).json({ error: 'Failed to create table order' });
+    console.error("Create table order error:", error);
+    res.status(500).json({ error: "Failed to create table order" });
   }
 });
 
@@ -91,27 +102,34 @@ router.post('/', (req, res) => {
  * PATCH /api/table-orders/:id/status
  * Update order status (triggers socket.io event)
  */
-router.patch('/:id/status', authenticate, (req, res) => {
+router.patch("/:id/status", authenticate, (req, res) => {
   try {
     const { id } = req.params;
     const { status } = req.body;
 
-    const validStatuses = ['pending', 'confirmed', 'preparing', 'ready', 'served', 'cancelled'];
+    const validStatuses = [
+      "pending",
+      "confirmed",
+      "preparing",
+      "ready",
+      "served",
+      "cancelled",
+    ];
     if (!status || !validStatuses.includes(status)) {
-      return res.status(400).json({ 
-        error: 'Valid status required', 
-        valid_statuses: validStatuses 
+      return res.status(400).json({
+        error: "Valid status required",
+        valid_statuses: validStatuses,
       });
     }
 
-    const order = (db.table_orders || []).find(o => o.id === id);
+    const order = (db.table_orders || []).find((o) => o.id === id);
     if (!order) {
-      return res.status(404).json({ error: 'Order not found' });
+      return res.status(404).json({ error: "Order not found" });
     }
 
     // Verify ownership
     if (order.merchant_id !== req.user.id) {
-      return res.status(403).json({ error: 'Access denied' });
+      return res.status(403).json({ error: "Access denied" });
     }
 
     order.status = status;
@@ -126,12 +144,12 @@ router.patch('/:id/status', authenticate, (req, res) => {
 
     res.json({
       success: true,
-      message: 'Order status updated',
-      data: order
+      message: "Order status updated",
+      data: order,
     });
   } catch (error) {
-    console.error('Update order status error:', error);
-    res.status(500).json({ error: 'Failed to update order status' });
+    console.error("Update order status error:", error);
+    res.status(500).json({ error: "Failed to update order status" });
   }
 });
 
