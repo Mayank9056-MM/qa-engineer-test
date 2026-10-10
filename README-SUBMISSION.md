@@ -1,0 +1,3 @@
+# EU Pay QA Engineer Assignment
+
+This repository contains my work for the EU Pay QA Engineer test assignment. I investigated the payment API and fixed Bug A by ensuring that payment amounts are returned as JSON numbers instead of strings. I added automated tests for the payment-list and payment-detail endpoints using Node.js's built-in test runner and Supertest. Both tests currently pass. Additional bug fixes, test coverage, and final verification are still in progress.
