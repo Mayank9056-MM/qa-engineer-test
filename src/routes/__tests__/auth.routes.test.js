@@ -1,27 +1,30 @@
-import { test } from 'node:test';
-import assert from 'node:assert';
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import request from "supertest";
+import app from "../../app.js";
 
-/**
- * Auth Routes Tests
- * 
- * Candidates should add tests here for Bug C (email validation)
- * 
- * Example test structure:
- * 
- * test('should reject email without TLD', async () => {
- *   const result = validateEmail('user@domain');
- *   assert.strictEqual(result, false);
- * });
- */
+test("Bug C: rejects email without a domain suffix", async () => {
+  const response = await request(app)
+    .post("/api/auth/register")
+    .send({
+      email: "user@domain",
+      password: "Test123!",
+      business_name: "Test Business",
+    });
 
-test('placeholder test - candidates should add real tests', () => {
-  assert.ok(true);
+  assert.equal(response.status, 400);
+  assert.equal(response.body.error, "Invalid email format");
 });
 
-// TODO: Add tests for:
-// - Valid email acceptance
-// - Invalid email rejection (no TLD, no @, etc.)
-// - Registration with valid data
-// - Registration with invalid email
-// - Login with correct credentials
-// - Login with incorrect credentials
+test("Bug C: accepts a valid email format", async () => {
+  const response = await request(app)
+    .post("/api/auth/register")
+    .send({
+      email: "valid-email-test@example.com",
+      password: "Test123!",
+      business_name: "Test Business",
+    });
+
+  assert.equal(response.status, 201);
+  assert.equal(response.body.user.email, "valid-email-test@example.com");
+});
