@@ -10,7 +10,6 @@ router.get("/", authenticate, (req, res) => {
     const merchantId = req.user.id;
     const payments = getPayments(merchantId);
 
-   
     const formattedPayments = payments.map((p) => ({
       id: p.id,
       amount: p.amount,
@@ -68,8 +67,18 @@ router.post("/", authenticate, (req, res) => {
     const { amount, currency, customer_email } = req.body;
 
     // Validation
-    if (!amount || isNaN(amount) || amount <= 0) {
-      return res.status(400).json({ error: "Valid amount is required" });
+    const MAX_PAYMENT_AMOUNT = 50000;
+
+    if (typeof amount !== "number" || !Number.isFinite(amount) || amount <= 0) {
+      return res.status(400).json({
+        error: "Valid amount is required",
+      });
+    }
+
+    if (amount > MAX_PAYMENT_AMOUNT) {
+      return res.status(400).json({
+        error: "Payment amount cannot exceed 50000",
+      });
     }
 
     // BUG B: No maximum amount check - allows unrealistic amounts
